@@ -4,20 +4,26 @@ import (
 	"bufio"
 	"context"
 	"embed"
+	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
-	"text/tabwriter"
+	"time"
 
+	"github.com/justinas/alice"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/hlog"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/text/runes"
 	"golang.org/x/text/secure/precis"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
-
-const wordsPerLine = 10
 
 var (
 	consonants         = []rune{'b', 'c', 'd', 'đ', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'x'}
@@ -45,18 +51,81 @@ type vowel struct {
 }
 
 func main() {
-	input := strings.TrimSpace(os.Args[1])
+	var port string
+	flag.StringVar(&port, "port", "8043", "which port to listen to")
+	flag.Parse()
+
+	log := zerolog.New(os.Stdout).With().
+		Timestamp().
+		Logger()
+
+	c := alice.New()
+
+	// Install the logger handler with default output on the console
+	c = c.Append(hlog.NewHandler(log))
+
+	// Install some provided extra handler to set some request's context fields.
+	// Thanks to that handler, all our logs will come with some prepopulated fields.
+	c = c.Append(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
+		hlog.FromRequest(r).Info().
+			Str("method", r.Method).
+			Stringer("url", r.URL).
+			Int("status", status).
+			Int("size", size).
+			Dur("duration", duration).
+			Msg("")
+	}))
+	c = c.Append(hlog.RemoteAddrHandler("ip"))
+	c = c.Append(hlog.UserAgentHandler("user_agent"))
+	c = c.Append(hlog.RefererHandler("referer"))
+	c = c.Append(hlog.RequestIDHandler("req_id", "Request-Id"))
+
+	// Here is your final handler
+	h := c.Then(http.HandlerFunc(findWords))
+	http.Handle("/", h)
+
+	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil); err != nil {
+		log.Fatal().Err(err).Msg("Startup failed")
+	}
+}
+
+func findWords(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	bodyStr := string(body)
+
+	if len(bodyStr) < 6 || len(bodyStr) > 15 {
+		http.Error(w, "Please enter 6 to 15 letters", http.StatusBadRequest)
+		return
+	}
+
+	hlog.FromRequest(r).Info().
+		Str("letters", bodyStr).
+		Msg("")
+
+	input := normalize(bodyStr)
 	cl, vl := splitIntoConsonantsAndVowels(input)
 
 	ws := makeWords(cl, vl)
-	// printWords(ws)
 	cws := make([]string, 0)
 	for _, w1 := range ws {
 		for _, w2 := range ws {
 			cws = append(cws, fmt.Sprintf("%s %s", w1, w2))
 		}
 	}
-	findInWordlist(cws)
+	words := findInWordlist(cws)
+
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(words); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func normalize(s string) string {
+	return removeAccentsFromVowel(strings.ToLower(strings.ReplaceAll(s, " ", "")))
 }
 
 func splitIntoConsonantsAndVowels(s string) ([]rune, []rune) {
@@ -64,9 +133,9 @@ func splitIntoConsonantsAndVowels(s string) ([]rune, []rune) {
 	vl := make([]rune, 0)
 	for _, char := range s {
 		if isConsonant(char) {
-			cl = append(cl, char)
+			cl = appendIfMissing(cl, char)
 		} else if isVowel(char) {
-			vl = append(vl, char)
+			vl = appendIfMissing(vl, char)
 		}
 	}
 	return cl, vl
@@ -108,6 +177,15 @@ func isDoubleVowel(s string) bool {
 	return false
 }
 
+func appendIfMissing[T comparable](s []T, r T) []T {
+	for _, l := range s {
+		if l == r {
+			return s
+		}
+	}
+	return append(s, r)
+}
+
 func isVowelWithoutFinalConsonant(s string) bool {
 	for _, vwfc := range vowelWithoutFinalConsonants {
 		if vwfc == s {
@@ -133,10 +211,7 @@ func makeWords(cl []rune, vl []rune) []string {
 	// fmt.Println(words)
 
 	vcs := makeVowelConsonants(vs, cs)
-	// fmt.Printf("vowel consonants: %+v\n", vcs)
-	for _, vc := range vcs {
-		words = append(words, vc)
-	}
+	words = append(words, vcs...)
 
 	for _, c := range cs {
 		for _, v := range vs {
@@ -206,7 +281,7 @@ func makeWords(cl []rune, vl []rune) []string {
 //go:embed Viet74K.txt
 var fs embed.FS
 
-func findInWordlist(dws []string) {
+func findInWordlist(dws []string) []string {
 	f, err := fs.Open("Viet74K.txt")
 	if err != nil {
 		panic(err)
@@ -237,7 +312,7 @@ func findInWordlist(dws []string) {
 		panic(err)
 	}
 
-	printWords(finalWords)
+	return finalWords
 }
 
 func makeConsonants(cl []rune) []string {
@@ -812,29 +887,4 @@ func isNotFrontBackAcuteDotVowelConsonant(s string) bool {
 		}
 	}
 	return false
-}
-
-func printWords(dws []string) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.AlignRight|tabwriter.Debug)
-	defer w.Flush()
-
-	i := 0
-	for i <= len(dws)-wordsPerLine {
-		fmt.Fprintf(w, fmt.Sprintf("%s\n", format(wordsPerLine)), toAny(dws[i:i+wordsPerLine])...)
-		i += wordsPerLine
-	}
-
-	fmt.Fprintf(w, fmt.Sprintf("%s\n", format(len(dws)-i)), toAny(dws[i:])...)
-}
-
-func format(count int) string {
-	return strings.Repeat("%s\t", count)
-}
-
-func toAny(words []string) []any {
-	a := make([]any, 0)
-	for _, w := range words {
-		a = append(a, w)
-	}
-	return a
 }
