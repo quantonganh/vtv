@@ -83,6 +83,7 @@ func main() {
 	// Here is your final handler
 	h := c.Then(http.HandlerFunc(findWords))
 	http.Handle("/", h)
+	http.HandleFunc("/shuffle", shuffle)
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil); err != nil {
 		log.Fatal().Err(err).Msg("Startup failed")
