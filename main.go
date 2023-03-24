@@ -278,11 +278,11 @@ func makeWords(cl []rune, vl []rune) []string {
 	return words
 }
 
-//go:embed Viet74K.txt
+//go:embed Viet39K.txt
 var fs embed.FS
 
 func findInWordlist(dws []string) []string {
-	f, err := fs.Open("Viet74K.txt")
+	f, err := fs.Open("Viet39K.txt")
 	if err != nil {
 		panic(err)
 	}
