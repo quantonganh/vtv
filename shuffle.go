@@ -44,11 +44,19 @@ func shuffle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		time.Sleep(15 * time.Second)
+		_, p, err := ws.ReadMessage()
+		if err == nil && string(p) == "\n" {
+			if err := ws.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
+				log.Println(err)
+				return
+			}
+		} else {
+			time.Sleep(2 * time.Second)
 
-		if err := ws.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
-			log.Println(err)
-			return
+			if err := ws.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
+				log.Println(err)
+				return
+			}
 		}
 
 		ws.WriteMessage(websocket.TextMessage, []byte("\n"))
