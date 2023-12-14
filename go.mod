@@ -1,15 +1,15 @@
 module github.com/quantonganh/vtv
 
-go 1.18
+go 1.21
 
 require (
-	github.com/justinas/alice v1.2.0
 	github.com/rs/zerolog v1.28.0
 	golang.org/x/sync v0.1.0
 )
 
 require (
 	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/quantonganh/go-cache v0.0.0-20231214171535-f84fd1336229 // indirect
 	golang.org/x/net v0.19.0 // indirect
 )
 

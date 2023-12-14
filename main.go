@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/quantonganh/go-cache"
 	"github.com/quantonganh/vtv/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
@@ -83,9 +84,11 @@ func main() {
 		zlog.Fatal().Err(err).Msg("error creating new template")
 	}
 
+	c := cache.New()
+
 	r.PathPrefix("/static/").Handler(http.FileServer(http.FS(ui.StaticFS)))
 	r.Handle("/", errorHandler(indexHandler(tmpl)))
-	r.Handle("/search", errorHandler(searchHandler(tmpl)))
+	r.Handle("/search", errorHandler(searchHandler(tmpl, c)))
 
 	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), r); err != nil {
 		zlog.Fatal().Err(err).Msg("Startup failed")
@@ -867,7 +870,7 @@ type appHandler func(w http.ResponseWriter, r *http.Request) error
 type PageData struct {
 	Query   string
 	Results [][]string
-	Total   int
+	Message string
 }
 
 func indexHandler(tmpl *template.Template) appHandler {
@@ -876,27 +879,37 @@ func indexHandler(tmpl *template.Template) appHandler {
 	}
 }
 
-func searchHandler(tmpl *template.Template) appHandler {
+func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		query := r.FormValue("q")
 		if len(query) < 6 || len(query) > 15 {
-			http.Error(w, "Search query length must be between 6 and 15 characters", http.StatusBadRequest)
-			return nil
-		}
-
-		input := normalize(query)
-		cl, vl := splitIntoConsonantsAndVowels(input)
-
-		ws := makeWords(cl, vl)
-		cws := make([]string, 0)
-		for _, w1 := range ws {
-			for _, w2 := range ws {
-				cws = append(cws, fmt.Sprintf("%s %s", w1, w2))
+			fmt.Println("< 6 or > 15")
+			data := PageData{
+				Query:   query,
+				Message: "Độ dài truy vấn tìm kiếm phải từ 6 đến 15 ký tự.",
 			}
+			return tmpl.ExecuteTemplate(w, "base", data)
 		}
-		words := findInWordlist(cws)
+
+		value, found := c.Get(query)
+		if found {
+			hlog.FromRequest(r).Info().Msgf("found search results for '%s' in the memory cache", query)
+		}
+
+		words, ok := value.([]string)
+		if !ok {
+			words = search(query)
+			c.Set(query, words, 7*24*time.Hour)
+		}
 
 		total := len(words)
+		var message string
+		if total == 0 {
+			message = "Không tìm thấy từ nào."
+		} else {
+			message = fmt.Sprintf("Kết quả: %d từ.", total)
+		}
+
 		results := make([][]string, 0)
 		for i := 0; i < total; i += wordsPerLine {
 			end := i + wordsPerLine
@@ -909,7 +922,7 @@ func searchHandler(tmpl *template.Template) appHandler {
 		data := PageData{
 			Query:   query,
 			Results: results,
-			Total:   total,
+			Message: message,
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
@@ -918,6 +931,21 @@ func searchHandler(tmpl *template.Template) appHandler {
 
 		return nil
 	}
+}
+
+func search(query string) []string {
+	input := normalize(query)
+	cl, vl := splitIntoConsonantsAndVowels(input)
+
+	ws := makeWords(cl, vl)
+	cws := make([]string, 0)
+	for _, w1 := range ws {
+		for _, w2 := range ws {
+			cws = append(cws, fmt.Sprintf("%s %s", w1, w2))
+		}
+	}
+
+	return findInWordlist(cws)
 }
 
 func errorHandler(handler appHandler) http.HandlerFunc {

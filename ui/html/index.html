@@ -9,43 +9,45 @@
 </div>
 {{ if .Query }}
 {{ if gt (len .Results) 0 }}
-<h6 class="text-left my-4">Kết quả: {{ .Total }} từ.</h6>
-{{ else }}
-<h6 class="text-left my-4">Không tìm thấy từ nào.</h6>
-{{ end }}
-{{ range $index, $words := .Results }}
-<div class="list-group list-group-horizontal">
-    {{ range $_, $word := $words }}
-    {{ if mod $index 9 0 }}
-    <a class="list-group-item list-group-item-action text-center" href='https://www.google.com/search?q="{{ $word }}"'
-        target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 1 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-primary"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 2 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-secondary"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 3 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-success"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 4 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-danger"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 5 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-warning"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 6 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-info"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 7 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-light"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
-    {{ else if mod $index 9 8 }}
-    <a class="list-group-item list-group-item-action text-center list-group-item-dark"
-        href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+<h6 class="text-left my-4">
+    {{ else }}
+    <h6 class="text-center my-4">
+        {{ end }}
+        {{ .Message }}
+    </h6>
+    {{ range $index, $words := .Results }}
+    <div class="list-group list-group-horizontal">
+        {{ range $_, $word := $words }}
+        {{ if mod $index 9 0 }}
+        <a class="list-group-item list-group-item-action text-center"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 1 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-primary"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 2 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-secondary"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 3 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-success"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 4 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-danger"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 5 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-warning"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 6 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-info"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 7 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-light"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ else if mod $index 9 8 }}
+        <a class="list-group-item list-group-item-action text-center list-group-item-dark"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ end }}
+        {{ end }}
+    </div>
     {{ end }}
     {{ end }}
-</div>
-{{ end }}
-{{ end }}
-{{ end }}
+    {{ end }}
