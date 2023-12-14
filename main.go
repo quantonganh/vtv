@@ -879,6 +879,11 @@ func indexHandler(tmpl *template.Template) appHandler {
 func searchHandler(tmpl *template.Template) appHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		query := r.FormValue("q")
+		if len(query) < 6 || len(query) > 15 {
+			http.Error(w, "Search query length must be between 6 and 15 characters", http.StatusBadRequest)
+			return nil
+		}
+
 		input := normalize(query)
 		cl, vl := splitIntoConsonantsAndVowels(input)
 
