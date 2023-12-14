@@ -3,7 +3,7 @@
 <div class="d-flex justify-content-center">
     <form class="form-inline my-4 my-lg-0" action="/search">
         <input class="form-control mr-sm-2" type="search" id="query" placeholder="6 đến 15 chữ cái" name="q"
-            pattern=".{6,15}" value="{{ .Query }}">
+            minlength="6" maxlength="15" required value="{{ .Query }}">
         <button type="submit" class="btn btn-primary">Tìm từ</button>
     </form>
 </div>
