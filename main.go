@@ -4,18 +4,17 @@ import (
 	"bufio"
 	"context"
 	"embed"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
-	"github.com/justinas/alice"
+	"github.com/gorilla/mux"
+	"github.com/quantonganh/vtv/ui"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/hlog"
 	"golang.org/x/sync/errgroup"
@@ -55,18 +54,14 @@ func main() {
 	flag.StringVar(&port, "port", "8043", "which port to listen to")
 	flag.Parse()
 
-	log := zerolog.New(os.Stdout).With().
+	zlog := zerolog.New(os.Stdout).With().
 		Timestamp().
 		Logger()
 
-	c := alice.New()
-
-	// Install the logger handler with default output on the console
-	c = c.Append(hlog.NewHandler(log))
-
-	// Install some provided extra handler to set some request's context fields.
-	// Thanks to that handler, all our logs will come with some prepopulated fields.
-	c = c.Append(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
+	// Here is your final handler
+	r := mux.NewRouter()
+	r.Use(hlog.NewHandler(zlog))
+	r.Use(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
 		hlog.FromRequest(r).Info().
 			Str("method", r.Method).
 			Stringer("url", r.URL).
@@ -75,52 +70,25 @@ func main() {
 			Dur("duration", duration).
 			Msg("")
 	}))
-	c = c.Append(hlog.RemoteAddrHandler("ip"))
-	c = c.Append(hlog.UserAgentHandler("user_agent"))
-	c = c.Append(hlog.RefererHandler("referer"))
-	c = c.Append(hlog.RequestIDHandler("req_id", "Request-Id"))
+	r.Use(hlog.UserAgentHandler("user_agent"))
+	r.Use(hlog.RefererHandler("referer"))
+	r.Use(hlog.RequestIDHandler("req_id", "Request-Id"))
 
-	// Here is your final handler
-	h := c.Then(http.HandlerFunc(findWords))
-	http.Handle("/", h)
-
-	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), nil); err != nil {
-		log.Fatal().Err(err).Msg("Startup failed")
-	}
-}
-
-func findWords(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
+	tmpl, err := template.New("index.html").Funcs(template.FuncMap{
+		"mod": func(i, j, r int) bool {
+			return i%j == r
+		},
+	}).ParseFS(content, "ui/html/*.html")
 	if err != nil {
-		log.Fatal(err)
-	}
-	bodyStr := string(body)
-
-	if len(bodyStr) < 6 || len(bodyStr) > 15 {
-		http.Error(w, "Please enter 6 to 15 letters", http.StatusBadRequest)
-		return
+		zlog.Fatal().Err(err).Msg("error creating new template")
 	}
 
-	hlog.FromRequest(r).Info().
-		Str("letters", bodyStr).
-		Msg("")
+	r.PathPrefix("/static/").Handler(http.FileServer(http.FS(ui.StaticFS)))
+	r.Handle("/", errorHandler(indexHandler(tmpl)))
+	r.Handle("/search", errorHandler(searchHandler(tmpl)))
 
-	input := normalize(bodyStr)
-	cl, vl := splitIntoConsonantsAndVowels(input)
-
-	ws := makeWords(cl, vl)
-	cws := make([]string, 0)
-	for _, w1 := range ws {
-		for _, w2 := range ws {
-			cws = append(cws, fmt.Sprintf("%s %s", w1, w2))
-		}
-	}
-	words := findInWordlist(cws)
-
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(words); err != nil {
-		log.Fatal(err)
+	if err := http.ListenAndServe(fmt.Sprintf(":%s", port), r); err != nil {
+		zlog.Fatal().Err(err).Msg("Startup failed")
 	}
 }
 
@@ -887,4 +855,73 @@ func isNotFrontBackAcuteDotVowelConsonant(s string) bool {
 		}
 	}
 	return false
+}
+
+const wordsPerLine = 5
+
+//go:embed ui/html/*.html
+var content embed.FS
+
+type appHandler func(w http.ResponseWriter, r *http.Request) error
+
+type PageData struct {
+	Query   string
+	Results [][]string
+	Total   int
+}
+
+func indexHandler(tmpl *template.Template) appHandler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		return tmpl.ExecuteTemplate(w, "base", PageData{})
+	}
+}
+
+func searchHandler(tmpl *template.Template) appHandler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		query := r.FormValue("q")
+		input := normalize(query)
+		cl, vl := splitIntoConsonantsAndVowels(input)
+
+		ws := makeWords(cl, vl)
+		cws := make([]string, 0)
+		for _, w1 := range ws {
+			for _, w2 := range ws {
+				cws = append(cws, fmt.Sprintf("%s %s", w1, w2))
+			}
+		}
+		words := findInWordlist(cws)
+
+		total := len(words)
+		results := make([][]string, 0)
+		for i := 0; i < total; i += wordsPerLine {
+			end := i + wordsPerLine
+			if end > total {
+				end = total
+			}
+			results = append(results, words[i:end])
+		}
+
+		data := PageData{
+			Query:   query,
+			Results: results,
+			Total:   total,
+		}
+
+		if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
+			return fmt.Errorf("error applying template: %w", err)
+		}
+
+		return nil
+	}
+}
+
+func errorHandler(handler appHandler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		err := handler(w, r)
+		if err != nil {
+			// Handle the error and send an appropriate response
+			fmt.Println("Error:", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+	}
 }
