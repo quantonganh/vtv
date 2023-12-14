@@ -7,8 +7,11 @@
         <button type="submit" class="btn btn-primary">Tìm từ</button>
     </form>
 </div>
+{{ if .Query }}
 {{ if gt (len .Results) 0 }}
 <h6 class="text-left my-4">Kết quả: {{ .Total }} từ.</h6>
+{{ else }}
+<h6 class="text-left my-4">Không tìm thấy từ nào.</h6>
 {{ end }}
 {{ range $index, $words := .Results }}
 <div class="list-group list-group-horizontal">
@@ -43,5 +46,6 @@
     {{ end }}
     {{ end }}
 </div>
+{{ end }}
 {{ end }}
 {{ end }}
