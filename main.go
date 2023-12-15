@@ -868,9 +868,11 @@ var content embed.FS
 type appHandler func(w http.ResponseWriter, r *http.Request) error
 
 type PageData struct {
-	Query   string
-	Results [][]string
-	Message string
+	Query     string
+	Results   [][]string
+	Message   string
+	Classes   []string
+	Remainder int
 }
 
 func indexHandler(tmpl *template.Template) appHandler {
@@ -919,10 +921,23 @@ func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 			results = append(results, words[i:end])
 		}
 
+		// https://getbootstrap.com/docs/5.0/components/list-group/#contextual-classes
+		classes := []string{
+			"",
+			" list-group-item-primary",
+			" list-group-item-secondary",
+			" list-group-item-success",
+			" list-group-item-danger",
+			" list-group-item-warning",
+			" list-group-item-info",
+			" list-group-item-light",
+			" list-group-item-dark",
+		}
 		data := PageData{
 			Query:   query,
 			Results: results,
 			Message: message,
+			Classes: classes,
 		}
 
 		if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
