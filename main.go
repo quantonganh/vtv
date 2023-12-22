@@ -12,6 +12,7 @@ import (
 	"sync"
 	"text/template"
 	"time"
+	"unicode/utf8"
 
 	"github.com/gorilla/mux"
 	"github.com/quantonganh/go-cache"
@@ -860,7 +861,11 @@ func isNotFrontBackAcuteDotVowelConsonant(s string) bool {
 	return false
 }
 
-const wordsPerLine = 5
+const (
+	minLength    = 6
+	maxLength    = 15
+	wordsPerLine = 5
+)
 
 //go:embed ui/html/*.html
 var content embed.FS
@@ -884,11 +889,11 @@ func indexHandler(tmpl *template.Template) appHandler {
 func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		query := r.FormValue("q")
-		if len(query) < 6 || len(query) > 15 {
-			fmt.Println("< 6 or > 15")
+		length := utf8.RuneCountInString(query)
+		if length < minLength || length > maxLength {
 			data := PageData{
 				Query:   query,
-				Message: "Độ dài truy vấn tìm kiếm phải từ 6 đến 15 ký tự.",
+				Message: fmt.Sprintf("Độ dài truy vấn tìm kiếm phải từ %d đến %d ký tự.", minLength, maxLength),
 			}
 			return tmpl.ExecuteTemplate(w, "base", data)
 		}
