@@ -64,13 +64,15 @@ func main() {
 	r := mux.NewRouter()
 	r.Use(hlog.NewHandler(zlog))
 	r.Use(hlog.AccessHandler(func(r *http.Request, status, size int, duration time.Duration) {
-		hlog.FromRequest(r).Info().
-			Str("method", r.Method).
-			Stringer("url", r.URL).
-			Int("status", status).
-			Int("size", size).
-			Dur("duration", duration).
-			Msg("")
+		if !strings.HasPrefix(r.URL.Path, "/static") {
+			hlog.FromRequest(r).Info().
+				Str("method", r.Method).
+				Stringer("url", r.URL).
+				Int("status", status).
+				Int("size", size).
+				Dur("duration", duration).
+				Msg("")
+		}
 	}))
 	r.Use(hlog.UserAgentHandler("user_agent"))
 	r.Use(hlog.RefererHandler("referer"))
