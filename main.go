@@ -950,7 +950,7 @@ func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 			"mod": func(i, j, r int) bool {
 				return i%j == r
 			},
-		}).ParseFiles("ui/html/results.html"))
+		}).ParseFS(content, "ui/html/results.html"))
 		tmpl.Execute(w, data)
 
 		return nil
