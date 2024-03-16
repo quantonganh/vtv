@@ -1,0 +1,19 @@
+{{ if gt (len .Results) 0 }}
+<h6 class="text-left my-4">
+    {{ else }}
+    <h6 class="text-center my-4">
+        {{ end }}
+        {{ .Message }}
+    </h6>
+    {{ range $index, $words := .Results }}
+    <div class="list-group list-group-horizontal">
+        {{ range $_, $word := $words }}
+        {{ range $class_index, $class := $.Classes}}
+        {{ if mod $index (len $.Classes) $class_index }}
+        <a class="list-group-item list-group-item-action text-center{{ index $.Classes $class_index }}"
+            href='https://www.google.com/search?q="{{ $word }}"' target="_blank">{{ $word }}</a>
+        {{ end }}
+        {{ end }}
+        {{ end }}
+    </div>
+    {{ end }}

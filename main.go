@@ -864,7 +864,6 @@ func isNotFrontBackAcuteDotVowelConsonant(s string) bool {
 }
 
 const (
-	minLength    = 6
 	maxLength    = 15
 	wordsPerLine = 5
 )
@@ -892,10 +891,10 @@ func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 	return func(w http.ResponseWriter, r *http.Request) error {
 		query := r.FormValue("q")
 		length := utf8.RuneCountInString(query)
-		if length < minLength || length > maxLength {
+		if length > maxLength {
 			data := PageData{
 				Query:   query,
-				Message: fmt.Sprintf("Độ dài truy vấn tìm kiếm phải từ %d đến %d ký tự.", minLength, maxLength),
+				Message: fmt.Sprintf("Độ dài lớn nhất của truy vấn tìm kiếm là %d ký tự.", maxLength),
 			}
 			return tmpl.ExecuteTemplate(w, "base", data)
 		}
@@ -947,9 +946,12 @@ func searchHandler(tmpl *template.Template, c *cache.Cache) appHandler {
 			Classes: classes,
 		}
 
-		if err := tmpl.ExecuteTemplate(w, "base", data); err != nil {
-			return fmt.Errorf("error applying template: %w", err)
-		}
+		tmpl := template.Must(template.New("results.html").Funcs(template.FuncMap{
+			"mod": func(i, j, r int) bool {
+				return i%j == r
+			},
+		}).ParseFiles("ui/html/results.html"))
+		tmpl.Execute(w, data)
 
 		return nil
 	}
