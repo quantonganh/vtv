@@ -1,14 +1,8 @@
 {{ define "content" }}
 <h3 class="text-center my-4">Vua Tiếng Việt</h3>
-<div class="d-flex justify-content-center">
-    <form class="d-flex align-items-center">
-        <input class="form-control" type="search" id="query" placeholder="Gõ để tìm kiếm..." name="q" maxlength="15"
-            required value="{{ .Query }}" hx-post="/search" hx-trigger="input changed delay:500ms, search"
-            hx-target="#search-results">
-        <button type="submit" class="btn btn-primary mx-2">Tìm&nbsp;từ</button>
-    </form>
-</div>
-<div style="margin-bottom: 20px;"></div>
+<input class="form-control justify-content-center" type="search" id="query"
+    placeholder="Gõ để tìm kiếm các từ phức trong tiếng Việt..." name="q" maxlength="15" required value="{{ .Query }}"
+    hx-post="/search" hx-trigger="input changed delay:500ms, search" hx-target="#search-results">
 <div id="search-results">
     <!-- Results will be loaded here -->
 </div>
